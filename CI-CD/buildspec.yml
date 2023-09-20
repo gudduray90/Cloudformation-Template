@@ -1,0 +1,36 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 14
+  pre_build:
+    commands:
+      - echo Pre Build started on `date`
+      - ls 
+      - echo Installing source NPM dependencies...
+      - npm install --legacy-peer-deps
+      # - npm update
+      # - npm install
+      - ls
+      - echo upgrade AWS CLI to latest version.....	    
+      - pip install --upgrade awscli
+  build:
+    commands:
+      - echo Build started on `date`
+      - npm run build
+      - ls
+      - cd build/
+      - ls
+      # - cd ..
+      # - cp -r public/favicons/ build/
+      # - cp -r public/images/ build/
+  post_build:
+    commands:
+      - echo Post Build started on `date`
+      # - aws s3 rm s3://$DEPLOYMENT_S3_BUCKET --recursive
+      # - aws s3 sync build/. s3://$DEPLOYMENT_S3_BUCKET/ --acl public-read
+      # #- aws s3api put-object-acl --bucket $DEPLOYMENT_S3_BUCKET --include "*" --acl public-read
+      # - aws cloudfront create-invalidation --distribution-id $DISTRIBUTION --paths "/*"
+artifacts:
+  files:
+    - '**/*'

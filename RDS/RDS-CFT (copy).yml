@@ -1,0 +1,190 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Metadata: 
+  License: Apache-2.0
+Description: 'This Template Create RDS With Read_Replica and CPU Alarm'
+Parameters:
+  DBName:
+    Default: MyDatabase
+    Description: The database name
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    #AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBUser:
+    NoEcho: 'true'
+    Description: The database admin account username
+    Type: String
+    Default: 'admindb'
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric
+      characters.
+  DBPassword:
+    NoEcho: 'true'
+    Description: The database admin account password
+    Type: String
+    Default: 'BPgrZAbgT6clsoTj2o23'
+    MinLength: '1'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9]+'
+    ConstraintDescription: must contain only alphanumeric characters.
+  DBEngine:
+    Description: Select DB Engine
+    Type: String
+    Default: 'MySQL'
+    AllowedValues: [MySQL, postgres]
+  DBStorageType:
+    Description: Select DB Storage Type 
+    Type: String
+    Default: "gp2"
+    AllowedValues: [gp2, gp3]
+  DBAllocatedStorage:
+    Default: '20'
+    Description: The size of the database (Gb)
+    Type: Number
+    MinValue: '5'
+    MaxValue: '1024'
+    ConstraintDescription: must be between 5 and 1024Gb.
+  DBInstanceClass:
+    Description: The database instance type
+    Type: String
+    Default: db.m5d.large
+    AllowedValues: [db.t3.small, db.t3.medium, db.m5d.large, db.m5d.xlarge]
+    ConstraintDescription: must select a valid database instance type.
+  EC2SecurityGroupid:
+    Description: The EC2 security group id that contains instances that need access to the database
+    Default: "sg-012ad6320a0e414dd"
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9\-]+'
+    ConstraintDescription: must be a valid security group name.
+  DBPorts:
+    Default: 3306
+    Description: TCP/IP port for the database
+    Type: Number
+    MinValue: 1150
+    MaxValue: 65535
+  DBPubliclyAccessible:
+    Type: String
+    Default: "False"
+    Description: DB will be publicly accessible or not.
+    AllowedValues: ["True","False"]
+  DBSubnetGroup1:
+    Description: Select DB Subnet Group.
+    Type: 'AWS::EC2::Subnet::Id'
+    Default: ''
+  DBSubnetGroup2:
+    Description: Select your DB Subnet Group.
+    Type: 'AWS::EC2::Subnet::Id'
+    Default: ''  
+  VpcId:
+    Description: Select VPC Id.
+    Type: 'AWS::EC2::VPC::Id'
+    Default: ''  
+  AutoMinorVersionUpgrade:
+    Description: Allow Automatic Minor Version Upgrades?
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  BackupRetentionPeriod:
+    Description: Enter Backup Retention Period in Days.
+    Type: Number
+    Default: '7'
+  MultiAZ:
+    Description: Multi-AZ master database
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    ConstraintDescription: must be true or false.
+Conditions:
+  Is-EC2-VPC: !Or [!Equals [!Ref 'AWS::Region', ap-south-1], !Equals [!Ref 'AWS::Region',
+      ap-south-1]]
+  Is-EC2-Classic: !Not [{Condition: Is-EC2-VPC}]
+Resources:
+  # RDS security group inbound and outbound access
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: RDSSecurityGroup
+      VpcId: !Ref VpcId
+      GroupDescription: Enable MySql access via user defined port
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref 'EC2SecurityGroupid'
+          FromPort: !Ref DBPorts
+          IpProtocol: tcp
+          ToPort: !Ref DBPorts
+
+  # RDS Subnet Group
+  RDSDBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: "description"
+      DBSubnetGroupName: "RDS_DB_PrivSubnet"
+      SubnetIds:
+        - !Ref DBSubnetGroup1
+        - !Ref DBSubnetGroup2
+        
+  #Database Instance
+  MasterDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref 'DBName'
+      AllowMajorVersionUpgrade: "false"
+      AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      AllocatedStorage: !Ref 'DBAllocatedStorage'
+      DBInstanceClass: !Ref 'DBInstanceClass'
+      Engine: !Ref DBEngine
+      StorageEncrypted: "True"
+      StorageType: !Ref DBStorageType
+      MasterUsername: !Ref 'DBUser'
+      MasterUserPassword: !Ref 'DBPassword'
+      MultiAZ: !Ref 'MultiAZ'
+      DBSubnetGroupName: !Ref RDSDBSubnetGroup
+      VPCSecurityGroups: 
+        - !Ref RDSSecurityGroup
+      Tags:
+      - Key: Name
+        Value: "pace20-devqa-master-mysql"
+    DeletionPolicy: Snapshot
+
+  #RDS CPU Alarm
+  RDSCPUAlarmHigh:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmDescription: Scale-up if CPU > 40% for 10 minutes
+      AlarmName: ProdRDSHighCPU
+      MetricName: CPUUtilization
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: '120'
+      EvaluationPeriods: '5'
+      Threshold: '40'
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref MasterDB
+      ComparisonOperator: GreaterThanThreshold
+
+  # ReplicaDB:
+  #   Type: AWS::RDS::DBInstance
+  #   Properties:
+  #     SourceDBInstanceIdentifier: !Ref 'MasterDB'
+  #     DBInstanceClass: !Ref 'DBInstanceClass'
+  #     Tags:
+  #     - Key: Name
+  #       Value: Read Replica Database
+Outputs:
+  EC2Platform:
+    Description: Platform in which this stack is deployed
+    Value: !If [Is-EC2-VPC, EC2-VPC, EC2-Classic]
+  MasterJDBCConnectionString:
+    Description: JDBC connection string for the master database
+    Value: !Join ['', ['jdbc:mysql://', !GetAtt [MasterDB, Endpoint.Address], ':',
+        !GetAtt [MasterDB, Endpoint.Port], /, !Ref 'DBName']]
+  # ReplicaJDBCConnectionString:
+  #   Description: JDBC connection string for the replica database
+  #   Value: !Join ['', ['jdbc:mysql://', !GetAtt [ReplicaDB, Endpoint.Address], ':',
+  #       !GetAtt [ReplicaDB, Endpoint.Port], /, !Ref 'DBName']]

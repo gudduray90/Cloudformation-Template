@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create a VPC and a VPC Peering connection using the PeerRole to accept.
+Parameters:
+  PeerRequesterAccountId:
+    Type: String
+    Default: ""
+Resources:
+  VpcPeerRole: {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Principal": {
+                "AWS": {
+                  "Ref": "PeerRequesterAccountId"
+                }
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ],
+              "Effect": "Allow"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "Vpc-Peering-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "ec2:AcceptVpcPeeringConnection",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+     }

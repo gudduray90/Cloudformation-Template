@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Configures SSM to deploy the Automox agent to all EC2 instances
+Parameters:
+  AutomoxGroup:
+    Type: String
+    Description: Automox group name (will be prefixed with AWS region)
+  AutomoxInstallToken:
+    Type: String
+    Description: Automox install token
+    Default: 1ee0fcd9-6c37-4f4c-a63f-1db41640fc46
+  AutomoxLinuxInstaller:
+    Type: String
+    Description: Automox Agent Linux installer location
+    Default: 'https://console.automox.com/downloadInstaller?accesskey='
+  AutomoxWindowsInstaller:
+    Type: String
+    Description: Automox Agent Windows installer location
+    Default: 'https://console.automox.com/installers/Automox_Installer-latest.msi'
+  AutoInstall:
+    Type: String
+    Description: Set to no to disable auto-installation
+    Default: 'No'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+Conditions:
+  AutoInstallCondition: !Equals [ 'Yes', !Ref AutoInstall ]
+Resources:
+  SSMDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      DocumentType: Command
+      TargetType: /AWS::EC2::Instance
+      Content:
+        description: 'Setup the Automox agent on Windows or Linux'
+        mainSteps:
+        - action: 'aws:runShellScript'
+          inputs:
+            timeoutSeconds: '240'
+            runCommand:
+              - |
+                #!/bin/bash
+                sleep 60
+                apt-get update
+                if [ $(ps -ef | grep amagent |wc -l) -lt 2 ]; then
+                baseurl="{{AutomoxLinuxSource}}"
+                amoxinstallkey="{{AutomoxInstallToken}}"
+                amoxinstallurl=$baseurl$amoxinstallkey
+                amoxgroupbase='Default Group/'
+                amoxgroup="{{AutomoxGroup}}"
+                amoxfullgroup=$amoxgroupbase$amoxgroup
+                curl -sS $amoxinstallurl | sudo bash
+                sudo systemctl unmask amagent.service
+                sudo systemctl restart amagent.service
+                sudo /opt/amagent/amagent --setgrp "$amoxfullgroup"
+                sudo /opt/amagent/amagent --deregister
+                sudo service amagent restart
+                else
+                echo "amagent already installed, exiting"
+                fi
+          name: 'SetupAutomoxAgentLinux'
+          precondition:
+            StringEquals:
+            - 'platformType'
+            - 'Linux'
+        - action: 'aws:runPowerShellScript'
+          name: 'SetupAutomoxAgentWindows'
+          inputs:
+            timeoutSeconds: '240'
+            runCommand:
+              - |
+                $amoxpath = "C:\Program Files (x86)\Automox\amagent.exe"
+                if (!(Test-Path $amoxpath)) {
+                  Import-Module PSReadLine
+                  Function Get-InstallLatestAutomoxInstallerAndRegister {
+                  $AutomoxGroupName = "{{AutomoxGroup}}"
+                  ##############################################################
+                  ##############################################################
+                      #Assigning variables
+                      $AutomoxMSIURL = "{{AutomoxWindowsSource}}"
+                      $AutomoxMSIfilename = "Automox_Installer-latest.msi"
+                      $AutomoxInstallKey = "{{AutomoxInstallToken}}"
+                      ##Modify the Group Name if being used for a different group
+                      $AutomoxGroupName = "$AutomoxGroupName"
+                      #################################################################
+                      #Modify to your expected output path
+                      $MSIOutPath = "c:\temp"
+                      #################################################################
+                      $AutomoxMSIOutPath = "$MSIOutPath\$AutomoxMSIfilename"
+                      Function Get-GetMSIFilePathIfMissing {
+                          if (!(test-path -path $MSIOutPath)) {new-item -path $MSIOutPath -itemtype directory}
+                      }
+                      Get-GetMSIFilePathIfMissing
+                      #Download the installer via Invoke WebRequest
+                      Invoke-WebRequest -Uri "$AutomoxMSIURL" -OutFile "$AutomoxMSIOutPath"
+                      #Change Directory to the Download Location
+                      cd $MSIOutPath
+                      #Embed the Access Key and Group into the installer
+                      Function get-automox_key_to_installer {
+                          $accessquery = @"
+                          INSERT INTO Property (Property, Value) VALUES ('ACCESSKEY' , '$AutomoxInstallKey')
+                "@
+                          $groupsquery = @"
+                          INSERT INTO Property (Property, Value) VALUES ('GROUP' , 'Default Group/$AutomoxGroupName')
+                "@
+                          $windowsInstaller = New-Object -ComObject WindowsInstaller.Installer
+                          $MSI = $windowsInstaller.OpenDatabase("$AutomoxMSIOutPath", 1)
+                          $view = $MSI.OpenView("$accessquery")
+                          $view.execute()
+                          $view.close()
+                          $view2 = $MSI.OpenView("$groupsquery")
+                          $view2.execute()
+                          $view2.close()
+                          $MSI.Commit()
+                          [System.Runtime.Interopservices.Marshal]::ReleaseComObject($windowsInstaller)| Out-Null  
+                      }
+                      get-automox_key_to_installer
+                      #Run the Installer
+                      Start-Process 'msiexec.exe' -ArgumentList '/i "Automox_Installer-latest.msi" /qn /norestart'
+                  }
+                  Get-InstallLatestAutomoxInstallerAndRegister
+                } else {
+                write-host "Agent already installed, exiting."
+                }
+          precondition:
+            StringEquals:
+              - 'platformType'
+              - 'Windows'
+        parameters:
+          AutomoxLinuxSource:
+            default: !Ref AutomoxLinuxInstaller
+            description: 'Automox Linux Installer source'
+            type: 'String'
+          AutomoxWindowsSource:
+            default: !Ref AutomoxWindowsInstaller
+            description: 'Automox Windows Installer source'
+            type: 'String'
+          AutomoxInstallToken:
+            default: !Ref AutomoxInstallToken
+            description: 'Automox Install Token'
+            type: 'String'
+          AutomoxGroup:
+            default: !Sub 'AWS.${AutomoxGroup}'
+            description: 'Automox Group Name'
+            type: 'String'
+        schemaVersion: '2.2'
+  SSMAssociation:
+    Condition: AutoInstallCondition
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: AutomoxAgentInstall
+      ComplianceSeverity: CRITICAL
+      MaxConcurrency: 100%
+      Name: !Ref SSMDocument
+      SyncCompliance: AUTO
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - '*'

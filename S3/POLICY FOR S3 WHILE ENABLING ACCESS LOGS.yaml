@@ -1,0 +1,38 @@
+{
+    "Version": "2012-10-17",
+    "Id": "AWSConsole-AccessLogs-Policy-1569322788103",
+    "Statement": [
+        {
+            "Sid": "AWSConsoleStmt-1569322788103",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::718504428378:root"   // Reference 1
+            },
+            "Action": "s3:PutObject",
+            "Resource": "arn of the Bucket /ALB_log/*"  //Reference 2
+        },
+        {
+            "Sid": "AWSLogDeliveryWrite",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "delivery.logs.amazonaws.com"
+            },
+            "Action": "s3:PutObject",
+            "Resource": "arn of the bucket /ALB_log/*", // Reference 2
+            "Condition": {
+                "StringEquals": {
+                    "s3:x-amz-acl": "bucket-owner-full-control"
+                }
+            }
+        },
+        {
+            "Sid": "AWSLogDeliveryAclCheck",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "delivery.logs.amazonaws.com"
+            },
+            "Action": "s3:GetBucketAcl",
+            "Resource": "arn of the bucket " // Refernece 2
+        }
+    ]
+}

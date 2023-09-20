@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: |
+  graphics magick layer
+Globals:
+  Function:
+    Timeout: 5
+Resources:
+  GraphicsmagickLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: graphicsmagick-layer
+      Description: Dependencies for the imager resizer app.
+      ContentUri:
+        Bucket: awsserverlessrepo-changesets-1sykndlz4vcjh
+        Key: 013297583948/arn:aws:serverlessrepo:us-east-1:226932388980:applications-graphicsmagick-layer-versions-0.0.1/b9ee3053-6b94-41ce-aa5c-35cd124da7aa
+      CompatibleRuntimes:
+      - nodejs12.x
+      RetentionPolicy: Retain
+Outputs:
+  LayerArn:
+    Value:
+      Ref: GraphicsmagickLayer
+

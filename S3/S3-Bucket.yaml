@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation template for s3 bucket
+Parameters:
+  DeletionPolicy:
+    Type: String
+    Default: 'Retain'
+  BucketName: 
+    Type: String
+    Description: Name would you like to use for the S3 Bucket
+    AllowedPattern: "^([a-z0-9]{1}[a-z0-9-]{1,61}[a-z0-9]{1})$"
+    ConstraintDescription: "Bucket names must start and end with a letter or number, and be between 3 and 63 characters in length."
+  Versioning:
+    Type: String
+    Description: Would you like to enable versioning for objects in the S3 Bucket?
+    AllowedValues:
+      - "Enabled"
+      - "Suspended"
+    Default: "Enabled"
+  
+
+Resources:
+  S3Bucket:
+    DeletionPolicy: !Ref DeletionPolicy
+    Type: 'AWS::S3::Bucket'
+    Description: Creating Amazon S3 bucket from CloudFormation
+    Properties:
+      BucketName: !Ref BucketName
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: !Ref Versioning
+      Tags: 
+        -  Key: Name
+           Value: !Ref BucketName
+        -  Key: ownername
+           Value: "ownername"
+        -  Key: createdBy
+           Value: "ABC"
+        -  Key: environment
+           Value: "Devlopment"
+        -  Key: businessunit
+           Value: "CompanyName"
+
+Outputs:
+  S3Bucket:
+    Description: Bucket Created using this template.
+    Value: !Ref S3Bucket
