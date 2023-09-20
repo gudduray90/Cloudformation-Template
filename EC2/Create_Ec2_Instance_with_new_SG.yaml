@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template will create an EC2 Instance with specific role.
+Parameters:
+  VpcId:
+    Description: Select your VPC Id.
+    Type: 'AWS::EC2::VPC::Id'
+    Default: ''
+  SubnetId1:
+    Description: Select your Subnet_Id like ap-southeast-2a.
+    Type: 'AWS::EC2::Subnet::Id'
+    Default: ''
+  AssociatePublicIpAddress:
+    Type: String
+    Default: "True"
+    Description: Public IPv4 supuld be assign to this EC2 or not.
+    AllowedValues:
+      - "True"
+      - "False"
+  SshServerKeyName:
+    Description: Select existing EC2 KeyPair.
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+  InstanceAMIId:
+    Description: Type the base Ami Id.
+    Type: String
+    Default: 'ami-006935d9a6773e4ec'
+  InstanceType:
+    Description: EC2 Instance type.
+    Type: String
+    Default: t2.micro
+  InstanceSecurityGroupName:
+    Description: Enter the security Group Name.
+    Type: String
+    Default: ''
+  Environmentname:
+    Description: Enter the Environmentname Name.
+    Type: String
+    Default: 'prod' 
+  Ec2RootVolumeSize:
+    Description: RootVolumeSize value in GB.
+    Type: Number
+  EC2InstanceName:
+    Description: Enter the Name of the Instance.
+    Default: ''
+    Type: String
+  EC2InstanceRole:
+    Description: Enter the Role Name.
+    Type: String
+    Default: 'EC2-SSM-Full-Access'
+Resources:
+  ProdWebInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2InstanceRole
+  EC2ServerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: EC2 Server Security Group
+      GroupName: !Ref InstanceSecurityGroupName
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: TCP
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0                                           
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Ref InstanceSecurityGroupName
+        - Key: businessunit
+          Value: default
+        - Key: environment
+          Value: !Ref Environmentname
+  
+  EC2Ec2Instance1:
+    Type: 'AWS::EC2::Instance'
+    DependsOn:
+      - EC2ServerSecurityGroup
+    Properties:
+      DisableApiTermination: 'false'
+      InstanceInitiatedShutdownBehavior: stop
+      IamInstanceProfile: !Ref ProdWebInstanceProfile
+      ImageId: !Ref InstanceAMIId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref SshServerKeyName
+      Monitoring: 'false'
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: 'true'
+            VolumeSize: !Ref Ec2RootVolumeSize
+            Encrypted: 'true'            
+      Tags:
+        - Key: Name
+          Value: !Ref EC2InstanceName
+        - Key: backup
+          Value: 'yes:f=1d:r=1d'
+        - Key: businessunit
+          Value: MAED_EMAIL
+        - Key: environment
+          Value: !Ref Environmentname
+        - Key: ownername
+          Value: na 
+      NetworkInterfaces:
+        - DeleteOnTermination: 'true'
+          Description: Primary network interface
+          DeviceIndex: 0
+          SubnetId: !Ref SubnetId1
+          AssociatePublicIpAddress: !Ref AssociatePublicIpAddress
+          GroupSet:
+            - !Ref EC2ServerSecurityGroup
+
