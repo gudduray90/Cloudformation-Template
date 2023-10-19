@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy EKS cluster for plsawsd-signe-eks-uat-cluster
+Parameters:
+  VPC:
+    Description: Select the VPC
+    Type: 'AWS::EC2::VPC::Id'
+    Default: vpc-02a89f75290e68fba
+  EksClusterSubnetIds:
+    Description: Select 3 pub and 3 private subnets for eks cluster.
+    Type: 'List<AWS::EC2::Subnet::Id>'
+    Default: ''
+  EnvironmentName:
+    Description: Name of the env
+    Type: String
+    Default: uat
+  EksClusterName:
+    Description: Name of Eks cluster
+    Type: String
+    Default: plsawsd-signe-eks-uat-cluster
+  EksVersion:
+    Description: Version of Eks
+    Type: String
+    Default: '1.27'
+  EksClusterRoleArn:
+    Description: Arn of role attached to Eks cluster
+    Type: String
+    Default: 'arn:aws:iam::085664843119:role/plsawsd-signe-uat-ekscluster-role'
+  EksClusterSG:
+    Description: Eks Cluster security group
+    Type: 'AWS::EC2::SecurityGroup::Id'
+    Default: sg-05209c29d8954a439
+Resources:
+  EKSCluster:
+    Type: 'AWS::EKS::Cluster'
+    Properties:
+      Name: !Ref EksClusterName
+      Version: !Ref EksVersion
+      RoleArn: !Ref EksClusterRoleArn
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !Ref EksClusterSG
+        SubnetIds: !Ref EksClusterSubnetIds
+        EndpointPublicAccess: false
+        EndpointPrivateAccess: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+

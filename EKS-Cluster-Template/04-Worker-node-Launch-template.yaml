@@ -1,0 +1,81 @@
+Description: It will create instace launch template for WorkerNode.
+Parameters:
+  VPC:
+    Description: Please Select the VPCID
+    Type: 'AWS::EC2::VPC::Id'
+    Default: vpc-02a89f75290e68fba
+  AppEnvType:
+    Description: Type of app environment
+    Type: String
+    Default: uat
+  KeyName:
+    Description: EC2 instance key name
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Default: plsawsd-signe-uat-node-group-key
+  Ec2RootVolumeSize:
+    Description: RootVolumeSize minimum value in GB
+    Type: Number
+    Default: '30'
+  Roles:
+    Description: Enter the Role Name.
+    Type: String
+    Default: plsawsd-signe-uat-eksmngnodegroup-role
+  ClusterName:
+    Description: EKS Cluster Name
+    Type: String
+    Default: plsawsd-signe-eks-uat-cluster
+Mappings:
+  RegionMap:
+    ap-south-1:
+      HVM64: ami-0a82b544ef71a207d
+Resources:
+  LaunchTemplate:
+    Type: 'AWS::EC2::LaunchTemplate'
+    Properties:
+      LaunchTemplateName: !Sub '${AWS::StackName}-launch-template'
+      LaunchTemplateData:
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              DeleteOnTermination: 'true'
+              Encrypted: 'true'
+              KmsKeyId: >-
+                arn:aws:kms:ap-south-1:085664843119:key/9d7670b3-b633-401c-a400-a020962384db
+              VolumeSize: !Ref Ec2RootVolumeSize
+              VolumeType: gp3
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${ClusterName}-workernode-uat'
+              - Key: KubernetesCluster
+                Value: !Ref ClusterName
+              - Key: AppEnvType
+                Value: !Ref AppEnvType
+              - Key: !Sub 'kubernetes.io/cluster/${ClusterName}'
+                Value: owned
+        UserData: !Base64 
+          'Fn::Sub': |
+            #!/bin/bash
+            set -o xtrace
+            /etc/eks/bootstrap.sh ${ClusterName} 
+            /opt/aws/bin/cfn-signal --exit-code $? \
+                    --stack  ${AWS::StackName} \
+                    --resource NodeGroup  \
+                    --region ${AWS::Region}
+               
+        ImageId: !FindInMap 
+          - RegionMap
+          - !Ref 'AWS::Region'
+          - HVM64
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - sg-0c558d0519d72d5cc
+        Monitoring:
+          Enabled: true
+Outputs:
+  LaunchTemplate:
+    Description: the newly created launch config
+    Value: !Ref LaunchTemplate
+AWSTemplateFormatVersion: 2010-09-09
+

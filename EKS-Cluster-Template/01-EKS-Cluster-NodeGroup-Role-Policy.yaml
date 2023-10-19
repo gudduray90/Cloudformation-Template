@@ -1,0 +1,320 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudformation template for IAM roles and policy for UAT Environment
+Parameters:
+  EC2RoleName:
+    Type: String
+    Default: plsawsd-signe-uat-eks-ec2-role
+    Description: Please enter your role name.
+  ClusterRolename:
+    Type: String
+    Default: plsawsd-signe-uat-ekscluster-role
+    Description: Please enter your role name.
+  EksNodeGroupRolename:
+    Type: String
+    Default: plsawsd-signe-uat-eksnodegroup-role
+    Description: Please enter your role name.
+  EksmngNodeGroupRolename:
+    Type: String
+    Default: plsawsd-signe-uat-eksmngnodegroup-role
+    Description: Please enter your role name.
+  Environment:
+    Type: String
+    Default: uat
+    Description: Please enter your Environment.
+Resources:
+  EC2RoleProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName: !Ref EC2RoleName
+      Path: /
+      Roles:
+        - !Ref EC2Role
+  EC2Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Ref EC2RoleName
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
+      Tags:
+        - Key: Name
+          Value: !Ref EC2RoleName
+        - Key: environment
+          Value: !Ref Environment
+  EksClusterRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Ref ClusterRolename
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEKSClusterPolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKSServicePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess'
+      Tags:
+        - Key: Name
+          Value: !Ref ClusterRolename
+        - Key: environment
+          Value: !Ref Environment
+  EksNodeGroupRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Ref EksNodeGroupRolename
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+        - 'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy'
+      Policies:
+        - PolicyName: EBSCSIDriver
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:AttachVolume'
+                  - 'ec2:CreateSnapshot'
+                  - 'ec2:CreateTags'
+                  - 'ec2:CreateVolume'
+                  - 'ec2:DeleteSnapshot'
+                  - 'ec2:DeleteTags'
+                  - 'ec2:DeleteVolume'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeSnapshots'
+                  - 'ec2:DescribeTags'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DetachVolume'
+                Resource: '*'
+        - PolicyName: ClusterAutoscaler
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                  - 'autoscaling:DescribeAutoScalingInstances'
+                  - 'autoscaling:DescribeLaunchConfigurations'
+                  - 'autoscaling:DescribeTags'
+                  - 'autoscaling:SetDesiredCapacity'
+                  - 'autoscaling:TerminateInstanceInAutoScalingGroup'
+                  - 'ec2:DescribeLaunchTemplateVersions'
+                Resource: '*'
+                Effect: Allow
+        - PolicyName: S3PowerUser
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: VisualEditor0
+                Effect: Allow
+                Action:
+                  - 's3:PutAnalyticsConfiguration'
+                  - 's3:GetObjectVersionTagging'
+                  - 's3:GetObjectAcl'
+                  - 's3:GetBucketObjectLockConfiguration'
+                  - 's3:GetObjectVersionAcl'
+                  - 's3:DeleteObject'
+                  - 's3:GetBucketPolicyStatus'
+                  - 's3:GetObjectRetention'
+                  - 's3:GetBucketWebsite'
+                  - 's3:PutObjectLegalHold'
+                  - 's3:GetObjectLegalHold'
+                  - 's3:GetBucketNotification'
+                  - 's3:PutBucketCORS'
+                  - 's3:GetReplicationConfiguration'
+                  - 's3:ListMultipartUploadParts'
+                  - 's3:PutObject'
+                  - 's3:GetObject'
+                  - 's3:GetAnalyticsConfiguration'
+                  - 's3:PutBucketObjectLockConfiguration'
+                  - 's3:GetObjectVersionForReplication'
+                  - 's3:GetLifecycleConfiguration'
+                  - 's3:GetInventoryConfiguration'
+                  - 's3:GetBucketTagging'
+                  - 's3:PutAccelerateConfiguration'
+                  - 's3:DeleteObjectVersion'
+                  - 's3:GetBucketLogging'
+                  - 's3:ListBucketVersions'
+                  - 's3:RestoreObject'
+                  - 's3:ListBucket'
+                  - 's3:GetAccelerateConfiguration'
+                  - 's3:GetBucketPolicy'
+                  - 's3:PutEncryptionConfiguration'
+                  - 's3:GetEncryptionConfiguration'
+                  - 's3:GetObjectVersionTorrent'
+                  - 's3:AbortMultipartUpload'
+                  - 's3:GetBucketRequestPayment'
+                  - 's3:GetObjectTagging'
+                  - 's3:GetMetricsConfiguration'
+                  - 's3:PutBucketVersioning'
+                  - 's3:GetBucketPublicAccessBlock'
+                  - 's3:ListBucketMultipartUploads'
+                  - 's3:GetBucketVersioning'
+                  - 's3:GetBucketAcl'
+                  - 's3:PutInventoryConfiguration'
+                  - 's3:GetObjectTorrent'
+                  - 's3:PutBucketRequestPayment'
+                  - 's3:PutObjectRetention'
+                  - 's3:GetBucketCORS'
+                  - 's3:GetBucketLocation'
+                  - 's3:GetObjectVersion'
+                Resource: '*'
+  EksmngNodeGroupRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Ref EksmngNodeGroupRolename
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+        - 'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy'
+      Policies:
+        - PolicyName: EBSCSIDrivers
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:AttachVolume'
+                  - 'ec2:CreateSnapshot'
+                  - 'ec2:CreateTags'
+                  - 'ec2:CreateVolume'
+                  - 'ec2:DeleteSnapshot'
+                  - 'ec2:DeleteTags'
+                  - 'ec2:DeleteVolume'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeSnapshots'
+                  - 'ec2:DescribeTags'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DetachVolume'
+                Resource: '*'
+        - PolicyName: ClusterAutoscalers
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                  - 'autoscaling:DescribeAutoScalingInstances'
+                  - 'autoscaling:DescribeLaunchConfigurations'
+                  - 'autoscaling:DescribeTags'
+                  - 'autoscaling:SetDesiredCapacity'
+                  - 'autoscaling:TerminateInstanceInAutoScalingGroup'
+                  - 'ec2:DescribeLaunchTemplateVersions'
+                Resource: '*'
+                Effect: Allow
+        - PolicyName: S3PowerUsers
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: VisualEditor0
+                Effect: Allow
+                Action:
+                  - 's3:PutAnalyticsConfiguration'
+                  - 's3:GetObjectVersionTagging'
+                  - 's3:GetObjectAcl'
+                  - 's3:GetBucketObjectLockConfiguration'
+                  - 's3:GetObjectVersionAcl'
+                  - 's3:DeleteObject'
+                  - 's3:GetBucketPolicyStatus'
+                  - 's3:GetObjectRetention'
+                  - 's3:GetBucketWebsite'
+                  - 's3:PutObjectLegalHold'
+                  - 's3:GetObjectLegalHold'
+                  - 's3:GetBucketNotification'
+                  - 's3:PutBucketCORS'
+                  - 's3:GetReplicationConfiguration'
+                  - 's3:ListMultipartUploadParts'
+                  - 's3:PutObject'
+                  - 's3:GetObject'
+                  - 's3:GetAnalyticsConfiguration'
+                  - 's3:PutBucketObjectLockConfiguration'
+                  - 's3:GetObjectVersionForReplication'
+                  - 's3:GetLifecycleConfiguration'
+                  - 's3:GetInventoryConfiguration'
+                  - 's3:GetBucketTagging'
+                  - 's3:PutAccelerateConfiguration'
+                  - 's3:DeleteObjectVersion'
+                  - 's3:GetBucketLogging'
+                  - 's3:ListBucketVersions'
+                  - 's3:RestoreObject'
+                  - 's3:ListBucket'
+                  - 's3:GetAccelerateConfiguration'
+                  - 's3:GetBucketPolicy'
+                  - 's3:PutEncryptionConfiguration'
+                  - 's3:GetEncryptionConfiguration'
+                  - 's3:GetObjectVersionTorrent'
+                  - 's3:AbortMultipartUpload'
+                  - 's3:GetBucketRequestPayment'
+                  - 's3:GetObjectTagging'
+                  - 's3:GetMetricsConfiguration'
+                  - 's3:PutBucketVersioning'
+                  - 's3:GetBucketPublicAccessBlock'
+                  - 's3:ListBucketMultipartUploads'
+                  - 's3:GetBucketVersioning'
+                  - 's3:GetBucketAcl'
+                  - 's3:PutInventoryConfiguration'
+                  - 's3:GetObjectTorrent'
+                  - 's3:PutBucketRequestPayment'
+                  - 's3:PutObjectRetention'
+                  - 's3:GetBucketCORS'
+                  - 's3:GetBucketLocation'
+                  - 's3:GetObjectVersion'
+                Resource: '*'
+Outputs:
+  EC2RoleArn:
+    Description: Arn of EC2RoleName Iam role
+    Value:
+      'Fn::GetAtt':
+        - EC2Role
+        - Arn
+  EksClusterRoleArn:
+    Description: Arn of ClusterRolename Iam role
+    Value:
+      'Fn::GetAtt':
+        - EksClusterRole
+        - Arn
+  EksNodeGroupRoleArn:
+    Description: Arn of EksNodeGroupRolename Iam role
+    Value:
+      'Fn::GetAtt':
+        - EksNodeGroupRole
+        - Arn
+  EksmngNodeGroupRoleArn:
+    Description: Arn of EksmngNodeGroupRolename Iam role
+    Value:
+      'Fn::GetAtt':
+        - EksmngNodeGroupRole
+        - Arn
+
