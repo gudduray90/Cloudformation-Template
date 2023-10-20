@@ -52,7 +52,7 @@ Resources:
   ApplicationLoadBalancer:
     Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
     Properties:
-      Name: -Testing-AWS-ALB
+      Name: Testing-AWS-ALB
       Scheme: internet-facing
       Type: application
       Subnets:
